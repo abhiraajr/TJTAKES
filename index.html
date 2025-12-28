@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Take a TJHSST Mimic Test - TJTAKES</title>
+    <style>
+        /* ============================
+   Layout & Body
+============================ */
+        body {
+            font-family: Arial, sans-serif;
+            background: #f9f9f9;
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background: #fff;
+            padding: 25px 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        /* ============================
+   Typography & Labels
+============================ */
+        label {
+            display: block;
+            margin: 15px 0 6px;
+            font-weight: 600;
+        }
+
+        .error-text {
+            color: red;
+            font-size: 13px;
+            margin-top: 3px;
+            display: none;
+        }
+
+        /* ============================
+   Inputs & Selects
+============================ */
+        input,
+        select {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            font-size: 15px;
+            box-sizing: border-box;
+            transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+        }
+
+        /* Invalid state */
+        input.invalid,
+        select.invalid {
+            border: 2px solid red;
+        }
+
+        /* Valid state */
+        input.valid,
+        select.valid {
+            border: 2px solid green;
+        }
+
+        input.valid+.error-text,
+        select.valid+.error-text {
+            color: green;
+        }
+
+        input.valid+.error-text::before,
+        select.valid+.error-text::before {
+            content: "✔ ";
+            font-weight: bold;
+        }
+
+        /* Focus state */
+        input:focus,
+        select:focus {
+            outline: none;
+            /* remove default orange outline */
+            border-color: #0073e6;
+            box-shadow: 0 0 5px rgba(0, 115, 230, 0.4);
+            background-color: #f9faff;
+        }
+
+        /* ============================
+   Select Dropdown Styling
+============================ */
+        select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background: white url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width='10'%20height='6'%20viewBox='0%200%2010%206'%20xmlns='http://www.w3.org/2000/svg'%3E%3Cpath%20d='M0%200l5%206%205-6z'%20fill='%23999'/%3E%3C/svg%3E") no-repeat right 12px center;
+            background-size: 10px 6px;
+            padding: 10px 40px 10px 12px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        select:hover {
+            border-color: #0073e6;
+        }
+
+        select:disabled {
+            background: #eee url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width='10'%20height='6'%20viewBox='0%200%2010%206'%20xmlns='http://www.w3.org/2000/svg'%3E%3Cpath%20d='M0%200l5%206%205-6z'%20fill='%23999'/%3E%3C/svg%3E") no-repeat right 12px center;
+            cursor: not-allowed;
+            color: #999;
+        }
+
+        /* ============================
+   Buttons
+============================ */
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 6px;
+            background: #0073e6;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>Take a TJHSST Mimic Test | TJTAKES</h2>
+
+        <label>Student Name</label>
+        <input id="name" placeholder="Full name">
+        <div class="error-text" id="nameError"></div>
+
+        <label>Test Type</label>
+        <select id="testType">
+            <option value="pse_and_narratives">PSE + Narratives</option>
+            <option value="pse_only">PSE only</option>
+            <option value="narratives_only">Narratives only</option>
+        </select>
+
+        <label>Google Sheets Link (Prompts)</label>
+        <input id="sheetUrl" placeholder="Public Google Sheet link">
+        <div class="error-text" id="sheetError"></div>
+
+        <label>Email to Send Responses</label>
+        <input id="email" placeholder="example@gmail.com">
+        <div class="error-text" id="emailError"></div>
+
+        <button id="startTest" disabled>Start Test</button>
+    </div>
+
+    <script>
+        const nameInput = document.getElementById("name");
+        const sheetInput = document.getElementById("sheetUrl");
+        const emailInput = document.getElementById("email");
+        const startBtn = document.getElementById("startTest");
+
+        const nameError = document.getElementById("nameError");
+        const sheetError = document.getElementById("sheetError");
+        const emailError = document.getElementById("emailError");
+
+        let sheetVerified = false;
+
+        // Utility: set valid/invalid styling
+        function setValidity(el, errorEl, isValid, message = "") {
+            if (isValid) {
+                el.classList.remove("invalid");
+                el.classList.add("valid");
+                // Show green checkmark and no message
+                errorEl.textContent = "";
+                errorEl.style.display = "block";
+            } else {
+                el.classList.remove("valid");
+                el.classList.add("invalid");
+                errorEl.textContent = message;
+                errorEl.style.display = "block";
+            }
+        }
+
+        // Validate name (non-empty, at least 2 words)
+        function validateName() {
+            const value = nameInput.value.trim();
+            const isValid = value && value.split(/\s+/).length >= 2;
+            setValidity(nameInput, nameError, isValid, "Enter full name (first and last)");
+            return isValid;
+        }
+
+        // Validate email (must be gmail)
+        function validateEmail() {
+            const value = emailInput.value.trim();
+            const isValid = /^[a-zA-Z0-9._%+-]+@gmail\.com$/.test(value);
+            setValidity(emailInput, emailError, isValid, "Enter a valid Gmail address");
+            return isValid;
+        }
+
+        // Validate Google Sheet (live fetch)
+        async function validateSheet() {
+            const url = sheetInput.value.trim();
+            if (!url) {
+                setValidity(sheetInput, sheetError, false, "Enter a Google Sheets link");
+                sheetVerified = false;
+                return false;
+            }
+            try {
+                const id = url.match(/\/d\/([^/]+)/)[1];
+                const testUrl = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:json&range=A1:A5`;
+                const res = await fetch(testUrl);
+                const text = await res.text();
+                if (!text.includes("google.visualization")) throw "bad";
+                setValidity(sheetInput, sheetError, true);
+                sheetVerified = true;
+                return true;
+            } catch {
+                setValidity(sheetInput, sheetError, false, "Sheet not accessible. Make sure it is public");
+                sheetVerified = false;
+                return false;
+            }
+        }
+
+        // Validate all
+        async function validateAll() {
+            const n = validateName();
+            const e = validateEmail();
+            const s = await validateSheet();
+            startBtn.disabled = !(n && e && s);
+        }
+
+        // Event listeners
+        [nameInput, emailInput].forEach(el => el.addEventListener("input", validateAll));
+        sheetInput.addEventListener("input", validateAll);
+
+        // Start Test
+        startBtn.onclick = () => {
+            const params = new URLSearchParams({
+                name: nameInput.value.trim(),
+                type: document.getElementById("testType").value,
+                sheet: sheetInput.value.trim(),
+                email: emailInput.value.trim()
+            });
+            location.href = `test.html?${params.toString()}`;
+        };
+    </script>
+</body>
+
+</html>

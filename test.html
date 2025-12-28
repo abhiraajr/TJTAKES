@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Test | TJTAKES</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f9f9f9;
+            padding: 20px;
+            user-select: none;
+        }
+
+        #timer {
+            font-size: 22px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .pair {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 20px;
+        }
+
+        .prompt {
+            background: #e0e0e0;
+            padding: 12px;
+            border-radius: 6px;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 50px;
+            resize: vertical;
+            padding: 10px;
+            margin-top: 6px;
+            border-radius: 6px;
+            border: 2px solid #ccc;
+            font-size: 14px;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+
+        .counter {
+            text-align: right;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .counter.invalid {
+            color: red;
+        }
+
+        .counter.valid {
+            color: green;
+        }
+
+        button {
+            padding: 12px;
+            font-size: 16px;
+            width: 100%;
+            border-radius: 6px;
+            border: none;
+            background: #0073e6;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+
+</head>
+
+<body oncontextmenu="return false" oncopy="return false" onpaste="return false">
+
+    <h1 id="pageTitle" style="text-align:center; margin-bottom:20px; font-family:Arial, sans-serif;"></h1>
+    <div id="timer"></div>
+    <div id="content"></div>
+    <button id="submit" disabled>Submit Test</button>
+
+    <script>
+        // Disable shortcuts
+        document.addEventListener("keydown", e => { if (e.ctrlKey || e.metaKey) e.preventDefault(); });
+
+        // Parameters
+        const params = new URLSearchParams(location.search);
+        const type = params.get("type");
+        const name = params.get("name");
+        const sheet = params.get("sheet");
+        const email = params.get("email");
+
+        // Update page title dynamically
+        const pageTitleEl = document.getElementById("pageTitle");
+        switch (type) {
+            case "pse_only":
+                pageTitleEl.textContent = "PSE Test | TJTAKES";
+                document.title = "PSE Test | TJTAKES";
+                break;
+            case "narratives_only":
+                pageTitleEl.textContent = "Narratives Test | TJTAKES";
+                document.title = "Narratives Test | TJTAKES";
+                break;
+            default:
+                pageTitleEl.textContent = "PSE and Narratives Test | TJTAKES";
+                document.title = "PSE and Narratives Test | TJTAKES";
+        }
+
+        // Timer variables
+        let totalTime = type === "pse_only" ? 1800 : type === "narratives_only" ? 3600 : 5400;
+        let timeLeft = totalTime;
+        let timerStarted = false;
+        const timerEl = document.getElementById("timer");
+
+        function updateTimerDisplay() {
+            const min = Math.floor(timeLeft / 60).toString().padStart(2, "0");
+            const sec = (timeLeft % 60).toString().padStart(2, "0");
+            timerEl.textContent = `${min}:${sec}`;
+        }
+
+        // Countdown function
+        function countdown() {
+            const interval = setInterval(() => {
+                updateTimerDisplay();
+                if (--timeLeft < 0) {
+                    clearInterval(interval);
+                    submitTest();
+                }
+            }, 1000);
+        }
+
+        // Fetch prompts
+        function parseGVIZ(text) { return JSON.parse(text.match(/setResponse\((.*)\)/s)[1]).table.rows.map(r => r.c[0]?.v || ""); }
+        async function loadPrompts() {
+            const id = sheet.match(/\/d\/([^/]+)/)[1];
+            const res = await fetch(`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:json&range=A1:A5`);
+            const rows = parseGVIZ(await res.text());
+            let pse = type !== "narratives_only" ? [rows[0]] : [], narratives = type !== "pse_only" ? rows.slice(1, 5) : [];
+            render(pse, narratives);
+        }
+
+        // Create prompt-response pair
+        function makePair(promptText, min, max) {
+            const div = document.createElement("div");
+            div.className = "pair";
+            div.innerHTML = `<div class="prompt">${promptText}</div>
+                   <textarea maxlength="${max}"></textarea>
+                   <div class="counter">0 / ${max}</div>`;
+            const ta = div.querySelector("textarea");
+            const counter = div.querySelector(".counter");
+            ta.dataset.min = min;
+
+            ta.addEventListener("focus", () => {
+                if (!timerStarted) {
+                    timerStarted = true;
+                    countdown();
+                }
+            });
+
+            ta.oninput = () => {
+                counter.textContent = `${ta.value.length} / ${max}`;
+                if (ta.value.length < min) {
+                    counter.classList.add('invalid');
+                    counter.classList.remove('valid');
+                } else {
+                    counter.classList.add('valid');
+                    counter.classList.remove('invalid');
+                }
+                checkSubmit();
+            };
+            return div;
+        }
+
+        // Render all pairs
+        function render(pse, narratives) {
+            const content = document.getElementById("content");
+            pse.forEach(p => content.appendChild(makePair(p, 2800, 3700)));
+            narratives.forEach(p => content.appendChild(makePair(p, 1, 1500)));
+            checkSubmit();
+        }
+
+        // Enable/disable submit button
+        function checkSubmit() {
+            const tas = [...document.querySelectorAll("textarea")];
+            const allValid = tas.every(t => t.value.length >= t.dataset.min && t.value.length <= t.maxLength);
+            document.getElementById("submit").disabled = !allValid;
+        }
+
+        // Submit logic
+        function submitTest() {
+            const tas = [...document.querySelectorAll("textarea")];
+            let body = "PSE Response:\n\n";
+            if (tas.length) body += tas[0].value + "\n\n";
+            tas.slice(1).forEach((t, i) => body += `Narrative ${i + 1}:\n\n${t.value}\n\n`);
+            body += `Submitted by ${name}\nPowered By TJTAKES`;
+
+            window.open(
+                `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}` +
+                `&su=${encodeURIComponent(`Responses from ${name} | TJTAKES`)}` +
+                `&body=${encodeURIComponent(body)}`, "_blank"
+            );
+        }
+
+        document.getElementById("submit").onclick = submitTest;
+
+        loadPrompts();
+        updateTimerDisplay();
+    </script>
+</body>
+
+</html>
